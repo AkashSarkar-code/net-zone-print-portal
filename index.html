@@ -248,8 +248,15 @@ async function loadFiles(files){
  pages=[];
  try{
   for(const f of files){
-   if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await loadPdf(f)}
-   else if(f.type.startsWith('image/')){await loadImg(f)}
+   try{
+    if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await loadPdf(f)}
+    else if(f.type.startsWith('image/')){await loadImg(f)}
+   }catch(e){
+    if(e.name==='NotFoundError'){await new Promise(r=>setTimeout(r,500));
+     if(f.type==='application/pdf'||/\.pdf$/i.test(f.name)){await loadPdf(f)}
+     else if(f.type.startsWith('image/')){await loadImg(f)}
+    }else throw e;
+   }
   }
   if(!pages.length){$('loadMsg').textContent='No photo/PDF found in those files.';return}
   cur=0;renderTabs();showPage(0);
@@ -648,21 +655,33 @@ async function runPdfTool(kind){
   if(kind==='merge'){
    const out=await PDFLib.PDFDocument.create();
    for(const f of files){
-    const src=await PDFLib.PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
-    const cp=await out.copyPages(src,src.getPageIndices());cp.forEach(p=>out.addPage(p));
+    const buf=await f.arrayBuffer();
+    let locked=false;
+    try{const d=await pdfjsLib.getDocument({data:buf.slice(0)}).promise;d.destroy()}
+    catch(e){if(e.name==='PasswordException')locked=true}
+    if(!locked){
+     const src=await PDFLib.PDFDocument.load(buf);
+     const cp=await out.copyPages(src,src.getPageIndices());cp.forEach(p=>out.addPage(p));
+    }else{
+     const cvPages=await rasterize(f,300);
+     for(const cv of cvPages){
+      const jpg=await out.embedJpg(dataURLtoBytes(cv.toDataURL('image/jpeg',0.95)));
+      const pg=out.addPage([jpg.width*72/300,jpg.height*72/300]);
+      pg.drawImage(jpg,{x:0,y:0,width:pg.getWidth(),height:pg.getHeight()});
+     }
+    }
    }
    dl(await out.save(),'NET ZONE-merged.pdf','application/pdf');
    $('ptMsg').textContent='Done - merged PDF downloaded.';
   }else if(kind==='unlock'){
-   const f=files[0];const buf=await f.arrayBuffer();
-   let src;
-   try{src=await PDFLib.PDFDocument.load(buf,{password:$('pw').value||undefined})}
-   catch(e){
-    const p=prompt('Password of this PDF:');if(p==null)throw new Error('Password needed');
-    $('pw').value=p;src=await PDFLib.PDFDocument.load(buf,{password:p});
-   }
+   const f=files[0];
+   const cvPages=await rasterize(f,300);
    const out=await PDFLib.PDFDocument.create();
-   const cp=await out.copyPages(src,src.getPageIndices());cp.forEach(p=>out.addPage(p));
+   for(const cv of cvPages){
+    const jpg=await out.embedJpg(dataURLtoBytes(cv.toDataURL('image/jpeg',0.95)));
+    const pg=out.addPage([jpg.width*72/300,jpg.height*72/300]);
+    pg.drawImage(jpg,{x:0,y:0,width:pg.getWidth(),height:pg.getHeight()});
+   }
    dl(await out.save(),'NET ZONE-unlocked.pdf','application/pdf');
    $('ptMsg').textContent='Done - unlocked PDF downloaded (no password now).';
   }else if(kind==='darken'){
