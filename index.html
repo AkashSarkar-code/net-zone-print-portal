@@ -624,7 +624,7 @@ function cleanApply(ch){
    let lo=0,hi=255,acc=0;const tot=p.length/4;
    while(acc<tot*0.02)acc+=hist[lo++];
    acc=0;while(acc<tot*0.02)acc+=hist[hi--];
-   for(let i=c;i<p.length;i+=4)p[i]=Math.max(0,Math.min(255,(p[i]-lo)*255/Math.max(1,hi-lo)));
+   if(hi-lo>10)for(let i=c;i<p.length;i+=4)p[i]=Math.max(0,Math.min(255,(p[i]-lo)*255/Math.max(1,hi-lo)));
   }
  }
  ctx.putImageData(d,0,0);showPage(cur);
