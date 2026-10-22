@@ -296,9 +296,9 @@ function renderTabs(){
  const t=$('pageTabs');t.innerHTML='';
  pages.forEach((p,i)=>{const b=el('button',i===cur?'on':'',p.name.length>22?p.name.slice(0,20)+'…':p.name);b.onclick=()=>showPage(i);t.appendChild(b)});
 }
-function dispScale(){const cv=pages[cur].canvas;return $('stageCanvas').width/cv.width}
+function dispScale(){const cv=pages[Math.min(cur,pages.length-1)].canvas;return $('stageCanvas').width/cv.width}
 function showPage(i){
- cur=i;renderTabs();
+ i=Math.max(0,Math.min(i,pages.length-1));cur=i;renderTabs();
  const p=pages[i],sc=$('stageCanvas'),stage=$('stage');
  const maxW=Math.max(340,stage.clientWidth-8);
  const ratio=Math.min(1,maxW/p.canvas.width);
@@ -588,8 +588,8 @@ submitCrop=async function(){
   const cv=await currentCropCanvas();
   const t=sheets[stTarget.page][stTarget.idx];
   t.img=cv.toDataURL('image/jpeg',0.95);t.srcCanvas=cv;
-  pages.pop();stTarget=null;setMode('rect');
-  curSheet=stTargetPage0;renderSheet();showPage(Math.max(0,pages.length-1));
+  pages.pop();stTarget=null;cur=Math.max(0,pages.length-1);setMode('rect');
+  curSheet=stTargetPage0;renderSheet();showPage(cur);
   $('cropMsg').textContent='Card straightened - the card on the A4 page is now straight.';
   return;
  }
